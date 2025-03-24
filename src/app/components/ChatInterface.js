@@ -1,4 +1,25 @@
+import '../weather-advisor.css';
 import { useState, useEffect, useRef } from 'react';
+
+// Add this style block at the top of your file
+// const styles = {
+//   weatherMessage: `
+//     .weather-message strong {
+//       font-weight: 600;
+//       color: #333;
+//     }
+//     .weather-message br + strong,
+//     .weather-message br + br + strong {
+//       display: inline-block;
+//       margin-top: 0.5rem;
+//       font-weight: 700;
+//       color: #1e40af;
+//     }
+//     .weather-message {
+//       line-height: 1.5;
+//     }
+//   `
+// };
 
 export default function ChatInterface({ locationData }) {
   const [messages, setMessages] = useState([
@@ -34,17 +55,48 @@ export default function ChatInterface({ locationData }) {
   useEffect(() => {
     if (!isTyping) return;
 
-    // Get the current message being typed
     const currentTypingMessage = messages[messages.length - 1];
     
     if (typingIndex < currentTypingMessage.content.length) {
-      // Continue typing the current message
-      const timeout = setTimeout(() => {
-        setTypingText(currentTypingMessage.content.substring(0, typingIndex + 1));
-        setTypingIndex(typingIndex + 1);
-      }, 15); // Adjust speed as needed
+      // Determine if we're typing plain text or HTML
+      const isHTML = currentTypingMessage.content.includes('<');
       
-      return () => clearTimeout(timeout);
+      if (isHTML) {
+        // For HTML content, increment more characters at once for tags
+        let newIndex = typingIndex;
+        let inTag = false;
+        
+        // Look ahead from current position to find tag boundaries
+        for (let i = typingIndex; i < Math.min(typingIndex + 10, currentTypingMessage.content.length); i++) {
+          newIndex = i;
+          const char = currentTypingMessage.content[i];
+          
+          if (char === '<') inTag = true;
+          if (char === '>') {
+            inTag = false;
+            newIndex = i + 1; // Include the closing bracket
+            break;
+          }
+          
+          // If not in a tag, only increment by a few characters at most
+          if (!inTag && i >= typingIndex + 3) break;
+        }
+        
+        const timeout = setTimeout(() => {
+          setTypingText(currentTypingMessage.content.substring(0, newIndex));
+          setTypingIndex(newIndex);
+        }, 15);
+        
+        return () => clearTimeout(timeout);
+      } else {
+        // Regular character-by-character typing for plain text
+        const timeout = setTimeout(() => {
+          setTypingText(currentTypingMessage.content.substring(0, typingIndex + 1));
+          setTypingIndex(typingIndex + 1);
+        }, 15);
+        
+        return () => clearTimeout(timeout);
+      }
     } else {
       // Typing complete
       setIsTyping(false);
@@ -98,10 +150,13 @@ export default function ChatInterface({ locationData }) {
       
       const data = await response.json();
       
+      // Format the LLM response for better display
+      const formattedContent = formatLLMResponse(data.answer || 'Sorry, I couldn\'t get weather information at this time.');
+      
       // Add the assistant's response to the chat
       const assistantMessage = { 
         role: 'assistant', 
-        content: data.answer || 'Sorry, I couldn\'t get weather information at this time.',
+        content: formattedContent,
         sources: data.sources || []
       };
       
@@ -127,6 +182,64 @@ export default function ChatInterface({ locationData }) {
     }
   };
 
+  // Function to format LLM responses for better display
+  const formatLLMResponse = (text) => {
+    if (!text) return '';
+    
+    // Convert the text to plain HTML with minimal formatting
+    // First, normalize line breaks
+    text = text.replace(/\r\n/g, '\n');
+    
+    // Create a cleaner version of the text
+    let cleanText = '';
+    
+    // Split by double newlines (paragraphs)
+    const paragraphs = text.split(/\n\n+/);
+    
+    paragraphs.forEach((paragraph) => {
+      if (!paragraph.trim()) return;
+      
+      // Check if this paragraph is a title/header (often ends with ":")
+      const isTitleLine = /^[A-Z][^:.!?]*:/.test(paragraph.trim());
+      
+      if (isTitleLine) {
+        // It's a title/header - make it bold with spacing
+        cleanText += `<div style="font-weight: 700; color: #1e40af; margin-top: 12px; margin-bottom: 4px;">${paragraph}</div>`;
+      } else if (paragraph.includes('*') || paragraph.includes('-') || /^\d+\./.test(paragraph.trim())) {
+        // It's a list - handle various list formats
+        
+        // Handle bullet points with consistent formatting
+        let listHTML = paragraph
+          .replace(/\n\* /g, '<br>• ')
+          .replace(/\n- /g, '<br>• ')
+          .replace(/^\* /gm, '• ')
+          .replace(/^- /gm, '• ');
+        
+        // Handle numbered lists
+        listHTML = listHTML.replace(/(\d+\.) /g, '<span style="font-weight: 600;">$1</span> ');
+        
+        cleanText += `<div style="margin-bottom: 8px;">${listHTML}</div>`;
+      } else {
+        // Regular paragraph
+        const processedParagraph = paragraph
+          .replace(/\n/g, '<br>')
+          .replace(/\*\*(.*?)\*\*/g, '<span style="font-weight: 700;">$1</span>');
+        
+        cleanText += `<div style="margin-bottom: 8px;">${processedParagraph}</div>`;
+      }
+    });
+    
+    // Make further adjustments for nested structures
+    cleanText = cleanText
+      // Format sections like "Temperature:" with special styling
+      .replace(/([A-Z][a-z]+):/g, '<span style="font-weight: 700; color: #1e40af;">$1:</span>')
+      // Convert remaining newlines to breaks
+      .replace(/\n/g, '<br>');
+    
+    // Wrap everything in a container with specific styling that overrides globals
+    return `<div style="font-family: Arial, sans-serif; color: #333333; line-height: 1.6;">${cleanText}</div>`;
+  };
+
   // Handle clearing the conversation
   const handleClearConversation = async () => {
     try {
@@ -146,87 +259,131 @@ export default function ChatInterface({ locationData }) {
     }
   };
 
+  // Add this function to your component
+  const handleSuggestionClick = (suggestion) => {
+    if (loading) return;
+    
+    setInput(suggestion);
+    // Automatically send after a short delay
+    setTimeout(() => {
+      const event = { preventDefault: () => {} };
+      handleSendMessage(event);
+    }, 100);
+  };
+
   return (
-    <div className="flex flex-col h-full max-w-md w-full mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
+    <div className="chat-container">
+      <div className="chat-header">
         <div>
-          <h2 className="text-xl font-bold">Weather Advisor</h2>
+          <h2 className="header-title">Weather Advisor</h2>
           {locationData && (
-            <div className="text-sm flex items-center mt-1">
+            <div className="header-location">
               <span className="mr-1">📍</span>
               <span>{locationData.city}, {locationData.country}</span>
             </div>
           )}
         </div>
         
-        <button 
-          onClick={handleClearConversation}
-          className="text-xs bg-blue-700 hover:bg-blue-800 px-2 py-1 rounded"
-          title="Clear conversation"
-        >
-          Clear Chat
-        </button>
+        <div className="header-controls">
+          <button 
+            onClick={handleClearConversation}
+            className="header-button"
+            title="Clear conversation"
+          >
+            Clear Chat
+          </button>
+          
+          <button
+            className="header-button"
+            onClick={() => {/* Handle location change */}}
+          >
+            Change
+          </button>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div 
-              className={`max-w-[80%] p-3 rounded-lg ${
-                message.role === 'user' 
-                  ? 'bg-blue-500 text-white rounded-br-none' 
-                  : 'bg-gray-200 text-gray-800 rounded-bl-none'
-              }`}
-            >
-              {isTyping && index === messages.length - 1 && message.role === 'assistant' 
-                ? typingText 
-                : message.content}
-              
-              {message.sources && message.sources.length > 0 && (
-                <div className="mt-2 text-xs italic opacity-70">
-                  Source: {message.sources.join(', ')}
+      <div className="messages-container">
+        {messages.map((message, index) => {
+          if (index === 0 && message.role === 'assistant' && !message.content.includes('Hi!')) {
+            // Initial weather summary
+            return (
+              <div key={index} className="weather-summary">
+                {message.content}
+              </div>
+            );
+          }
+          
+          if (message.role === 'user') {
+            return (
+              <div key={index} className="user-message-container">
+                <div className="user-message">
+                  {message.content}
                 </div>
-              )}
+              </div>
+            );
+          }
+          
+          return (
+            <div key={index} className="assistant-message-container">
+              <div className="assistant-message">
+                {isTyping && index === messages.length - 1 ? (
+                  <div dangerouslySetInnerHTML={{ __html: typingText }} />
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: message.content }} />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-200 text-gray-800 p-3 rounded-lg rounded-bl-none">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-bounce"></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+          <div className="assistant-message-container">
+            <div className="assistant-message">
+              <div className="loading-dots">
+                <div className="loading-dot"></div>
+                <div className="loading-dot"></div>
+                <div className="loading-dot"></div>
               </div>
             </div>
           </div>
         )}
+        
         <div ref={messageEndRef} />
       </div>
       
-      <form onSubmit={handleSendMessage} className="p-4 border-t">
-        <div className="flex">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about weather or get advice..."
-            className="flex-1 p-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-            disabled={loading || !input.trim()}
-          >
-            Send
-          </button>
+      <div className="suggestion-pills">
+        <div className="suggestion-pill" onClick={() => handleSuggestionClick("Will I need my sunglasses today?")}>
+          Need sunglasses?
         </div>
-      </form>
+        <div className="suggestion-pill" onClick={() => handleSuggestionClick("Is it safe for hiking today?")}>
+          Safe for hiking?
+        </div>
+        <div className="suggestion-pill" onClick={() => handleSuggestionClick("What should I wear today?")}>
+          What to wear?
+        </div>
+      </div>
+      
+      <div className="input-container">
+        <form onSubmit={handleSendMessage}>
+          <div className="input-wrapper">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about weather or get advice..."
+              className="chat-input"
+              disabled={loading}
+            />
+            <button
+              type="submit"
+              className="send-button"
+              disabled={loading || !input.trim()}
+            >
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

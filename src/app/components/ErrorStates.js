@@ -29,7 +29,7 @@ export function LocationError({ onChangeLocation }) {
         </div>
         <div className="ml-3">
           <p className="text-sm text-yellow-700">
-            We're having trouble with your location information.
+            We&apos;re having trouble with your location information.
           </p>
           <button 
             onClick={onChangeLocation}

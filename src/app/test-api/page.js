@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export default function TestAPI() {
   const [query, setQuery] = useState('Saint Louis, MO');

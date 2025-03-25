@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export default function LocationSetup({ onLocationSet }) {
   const [cityInput, setCityInput] = useState('');
@@ -10,7 +10,7 @@ export default function LocationSetup({ onLocationSet }) {
   const inputRef = useRef(null);
 
   // Fetch location suggestions from the API
-  const fetchLocationSuggestions = async (query) => {
+  const fetchLocationSuggestions = useCallback(async (query) => {
     // Don't search until at least 3 characters have been entered
     if (!query || query.trim().length < 3) {
       setSuggestions([]);
@@ -71,7 +71,7 @@ export default function LocationSetup({ onLocationSet }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Helper function to extract a readable location name
   const extractLocationName = (result) => {
@@ -103,7 +103,7 @@ export default function LocationSetup({ onLocationSet }) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [cityInput]);
+  }, [cityInput, fetchLocationSuggestions]);
 
   // Handle location selection
   const handleSelectLocation = (location) => {

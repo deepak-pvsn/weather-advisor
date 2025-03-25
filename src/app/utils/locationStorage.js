@@ -66,14 +66,15 @@ export const formatLocationForQuery = (location) => {
   return `${location.city}, ${location.country} (${location.lat}, ${location.lng})`;
 };
 
-// Export the utilities
-export default {
+const locationStorage = {
   saveLocation,
   getStoredLocation,
   hasStoredLocation,
   clearStoredLocation,
   formatLocationForQuery
 };
+
+export default locationStorage;
 
 // Note: Remove any LLM related code from this file
 // This file should only handle localStorage operations

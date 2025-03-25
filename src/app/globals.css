@@ -238,8 +238,3 @@ p {
   display: none;  /* Chrome, Safari and Opera */
 }
 
-/* Add this to your globals.css to explicitly override the text color in user messages */
-.user-message-text {
-  color: white !important;
-}
-

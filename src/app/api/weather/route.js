@@ -1277,7 +1277,7 @@ ${structuredData}`;
   try {
     console.log("Using LLM to analyze weather with identified intent:", intent);
     
-    // Make a request to OpenRouter API
+    // Add timeout to axios request
     const apiResponse = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
@@ -1294,7 +1294,9 @@ ${structuredData}`;
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
           'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000'
-        }
+        },
+        // Add timeout configuration
+        timeout: 30000 // 30 seconds timeout
       }
     );
     
@@ -1316,6 +1318,17 @@ ${structuredData}`;
     console.log("LLM response received:", answer.substring(0, 100) + "...");
     return answer;
   } catch (error) {
+    // Improve error handling
+    if (error.code === 'ECONNABORTED') {
+      console.error("Request timed out");
+      return "I apologize, but the request timed out. Please try again.";
+    }
+    
+    if (error.response?.status === 504) {
+      console.error("Gateway timeout");
+      return "The server took too long to respond. Please try again.";
+    }
+    
     console.error("Error getting LLM response:", error.message);
     
     // If error contains response data, log it for debugging

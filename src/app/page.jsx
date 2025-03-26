@@ -195,6 +195,202 @@ export default function Page() {
     "Good for running?"
   ];
 
+  // First, add a function to format the chat messages with better styling
+  const formatMessage = (content) => {
+    // Early return if content is empty or undefined
+    if (!content) return <p>No information available</p>;
+    
+    // Check if this is a weather or advice response
+    const isInfoResponse = content.includes('°F') || 
+                          content.includes('Temperature') || 
+                          content.includes('weather') || 
+                          content.includes('air quality') ||
+                          content.includes('AQI') ||
+                          content.includes('humidity');
+    
+    if (isInfoResponse) {
+      // THOROUGH cleanup of all formatting characters that might appear
+      content = content
+        // Remove formatting characters
+        .replace(/###/g, '')
+        .replace(/---/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/:\*\*/g, ':')
+        .replace(/\*:/g, ':')
+        
+        // Remove emojis
+        .replace(/\s+🌡️/g, ' ')
+        .replace(/\s+🔥/g, ' ')
+        .replace(/🥵/g, '')
+        .replace(/🐕/g, '')
+        .replace(/🐈/g, '')
+        .replace(/📱/g, '')
+        .replace(/👕/g, '')
+        .replace(/💧/g, '')
+        .replace(/🌀/g, '')
+        .replace(/🌧️/g, '')
+        .replace(/☀️/g, '')
+        .replace(/⚠️/g, '')
+        
+        // The critical part - handle starred text like *This is bold*
+        // Pattern to find all text between asterisks
+        .replace(/\*([^*]+)\*/g, '$1');
+      
+      // Now separate the content into logical sections
+      const sections = [];
+      let currentSection = { title: null, content: [] };
+      
+      const lines = content.split('\n').filter(line => line.trim().length > 0);
+      
+      lines.forEach((line) => {
+        // Check if this is a header/section title
+        if (line.match(/^[A-Z].*:/) || // Starts with capital and has colon
+            line.includes('Air Quality') ||
+            line.includes('AQI Overview') ||
+            line.includes('Weather Alert') ||
+            line.includes('If air quality')) {
+          
+          // If we already have content in the current section, push it to sections
+          if (currentSection.title && currentSection.content.length > 0) {
+            sections.push({ ...currentSection });
+          }
+          
+          // Start a new section
+          currentSection = {
+            title: line,
+            content: []
+          };
+        } else {
+          // This is content for the current section
+          currentSection.content.push(line);
+        }
+      });
+      
+      // Don't forget to add the last section
+      if (currentSection.title && currentSection.content.length > 0) {
+        sections.push({ ...currentSection });
+      }
+      
+      // Now render all sections in a clean, unified container
+      return (
+        <div className="bg-white border border-blue-100 rounded-lg p-5">
+          {sections.map((section, idx) => (
+            <div key={idx} className="mb-6 last:mb-0">
+              {/* Section title */}
+              <h3 className="text-blue-600 font-bold text-lg border-b border-blue-100 pb-2 mb-3">
+                {section.title}
+              </h3>
+              
+              {/* Section content */}
+              <div className="space-y-3 ml-1">
+                {section.content.map((line, lineIdx) => {
+                  // Check for subheadings (like "Key Drivers", "Seasonal Context", etc.)
+                  if (line.includes('Key Drivers') || 
+                      line.includes('Seasonal Context') || 
+                      line.includes('What\'s Next') ||
+                      line.match(/^[A-Z][a-z]+([ ][A-Z][a-z]+){1,3}:$/) || // Captures patterns like "Something Something:"
+                      line.match(/^[A-Z][a-z]+ [A-Z][a-z]+:$/)) {  // Captures patterns like "Something Something:"
+                    return (
+                      <div key={lineIdx} className="mt-4 mb-2">
+                        <h4 className="text-blue-800 font-semibold text-base bg-blue-50 py-1 px-2 rounded-md">{line}</h4>
+                      </div>
+                    );
+                  }
+                  
+                  // Check for bullet points (lines starting with -)
+                  if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
+                    const bulletContent = line.replace(/^[\s-•]+/, '');
+                    return (
+                      <div key={lineIdx} className="flex items-start">
+                        <span className="text-blue-500 mr-2 mt-1">•</span>
+                        <span className="text-gray-700">{bulletContent}</span>
+                      </div>
+                    );
+                  }
+                  
+                  // Check for numbered items (like "1. Item")
+                  if (line.match(/^\d+\./)) {
+                    const parts = line.split(/^(\d+\.\s*)/);
+                    return (
+                      <div key={lineIdx} className="flex items-start">
+                        <span className="text-blue-600 font-medium mr-2">{parts[1]}</span>
+                        <span className="text-gray-700">{parts[2] || ''}</span>
+                      </div>
+                    );
+                  }
+                  
+                  // Special handling for colored AQI levels
+                  if (line.includes('0-50') && line.includes('Good')) {
+                    return (
+                      <div key={lineIdx} className="flex items-center my-1">
+                        <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                        <span className="text-gray-700">{line}</span>
+                      </div>
+                    );
+                  }
+                  
+                  if (line.includes('51-100') && line.includes('Moderate')) {
+                    return (
+                      <div key={lineIdx} className="flex items-center my-1">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                        <span className="text-gray-700">{line}</span>
+                      </div>
+                    );
+                  }
+                  
+                  if (line.includes('101-150') && line.includes('Unhealthy')) {
+                    return (
+                      <div key={lineIdx} className="flex items-center my-1">
+                        <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
+                        <span className="text-gray-700">{line}</span>
+                      </div>
+                    );
+                  }
+                  
+                  if (line.includes('151+') && line.includes('Hazardous')) {
+                    return (
+                      <div key={lineIdx} className="flex items-center my-1">
+                        <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                        <span className="text-gray-700">{line}</span>
+                      </div>
+                    );
+                  }
+                  
+                  // Regular paragraph
+                  return <p key={lineIdx} className="text-gray-700">{line}</p>;
+                })}
+              </div>
+            </div>
+          ))}
+          
+          {/* If there are no sections, just display the content directly */}
+          {sections.length === 0 && (
+            <p className="text-gray-700">{content}</p>
+          )}
+        </div>
+      );
+    }
+    
+    // For non-weather responses (like general text)
+    return (
+      <div className="bg-white border border-blue-100 rounded-lg p-5">
+        <div className="space-y-2">
+          {content.split('\n')
+            .filter(line => line.trim().length > 0)
+            .map((line, i) => {
+              // Remove all formatting characters including asterisks
+              const cleanLine = line
+                .replace(/###/g, '')
+                .replace(/---/g, '')
+                .replace(/\*([^*]+)\*/g, '$1');
+              
+              return <p key={i} className="text-gray-700">{cleanLine}</p>;
+            })}
+        </div>
+      </div>
+    );
+  };
+
   // Show loading state until component is mounted on client
   if (!isMounted) {
     return <Loading />;
@@ -327,21 +523,30 @@ export default function Page() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-white">Weather Advisor</h1>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold text-white">Weather Advisor</h1>
+            {/* Add location display */}
+            <span className="text-xs text-blue-100 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              {location.city}, {location.country}
+            </span>
+          </div>
         </div>
         
         <div className="flex items-center space-x-3">
           {/* Fixed buttons with contrasting background */}
           <button 
             onClick={clearChat}
-            className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-1.5 text-sm font-medium rounded-full shadow-sm transition-colors"
+            className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-1.5 text-sm font-medium rounded-full shadow-sm transition-colors cursor-pointer"
           >
             Clear Chat
           </button>
           
           <button 
             onClick={changeLocation}
-            className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-1.5 text-sm font-medium rounded-full shadow-sm transition-colors"
+            className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-1.5 text-sm font-medium rounded-full shadow-sm transition-colors cursor-pointer"
           >
             Change Location
           </button>
@@ -368,7 +573,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* Enhanced chat messages */}
+          {/* Enhanced chat messages with better formatting */}
           {chatHistory.map((message, index) => (
             message.role !== 'system' && (
               <div 
@@ -380,15 +585,21 @@ export default function Page() {
                   className={`
                     p-4 max-w-[80%] shadow-md
                     ${message.role === 'user' 
-                      ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-tl-xl rounded-tr-xl rounded-bl-none rounded-br-xl' 
+                      ? 'bg-blue-600 text-white rounded-tl-xl rounded-tr-xl rounded-bl-none rounded-br-xl' 
                       : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none rounded-tr-xl rounded-bl-xl rounded-br-xl'
                     }
                   `}
                 >
-                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                  <div className={`text-xs mt-1 text-right ${message.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
-                    {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                  </div>
+                  {message.role === 'user' ? (
+                    <div>
+                      <div className="text-white font-medium mb-1">{message.content}</div>
+                      <div className="text-xs text-blue-200 text-right">
+                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </div>
+                    </div>
+                  ) : (
+                    formatMessage(message.content)
+                  )}
                 </div>
               </div>
             )
@@ -423,7 +634,7 @@ export default function Page() {
                   setQuestion(q);
                   setTimeout(() => sendQuestion(), 100);
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap shadow transition-all duration-200 hover:shadow-md"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap shadow transition-all duration-200 hover:shadow-md cursor-pointer"
               >
                 {q}
               </button>
@@ -450,13 +661,13 @@ export default function Page() {
               className={`px-4 flex items-center justify-center ${
                 isLoading || !question.trim() 
                   ? 'bg-blue-300 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
               } text-white transition-colors duration-200`}
               aria-label="Send message"
             >
-              {/* Modified paper airplane icon pointing right */}
+              {/* Replaced with arrow pointing right */}
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
           </div>

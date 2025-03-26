@@ -1281,7 +1281,7 @@ ${structuredData}`;
     const apiResponse = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: 'google/gemini-2.0-pro-exp-02-05:free',
+        model: 'deepseek/deepseek-r1:free',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -1298,11 +1298,31 @@ ${structuredData}`;
       }
     );
     
+    // Add error checking and logging to debug the response
+    if (!apiResponse.data) {
+      console.error("Empty response from OpenRouter API");
+      return createFallbackAnswer(question, data, intent);
+    }
+    
+    console.log("API Response structure:", JSON.stringify(apiResponse.data).substring(0, 300));
+    
+    // Check if the choices array exists and has at least one element
+    if (!apiResponse.data.choices || !apiResponse.data.choices.length) {
+      console.error("No choices in API response:", apiResponse.data);
+      return createFallbackAnswer(question, data, intent);
+    }
+    
     const answer = apiResponse.data.choices[0].message.content;
     console.log("LLM response received:", answer.substring(0, 100) + "...");
     return answer;
   } catch (error) {
     console.error("Error getting LLM response:", error.message);
+    
+    // If error contains response data, log it for debugging
+    if (error.response) {
+      console.error("API error details:", error.response.data);
+    }
+    
     return createFallbackAnswer(question, data, intent);
   }
 }

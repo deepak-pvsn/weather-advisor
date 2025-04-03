@@ -1237,6 +1237,20 @@ Based on the weather data provided, answer the user's question accurately and he
 If you don't have certain information, acknowledge that limitation but provide what you do know.`;
 }
 
+// Adjust max_tokens based on the type of response needed
+const getMaxTokensForIntent = (intent) => {
+  switch (intent) {
+    case 'current_conditions':
+      return 300;  // Simple current weather needs less tokens
+    case 'forecast':
+      return 600;  // Forecast needs more tokens for multiple days
+    case 'explanation':
+      return 800;  // Detailed explanations need more tokens
+    default:
+      return 500;  // Default balanced value
+  }
+};
+
 // Analyze weather data with LLM
 async function analyzeWeatherWithLLM(question, location, weatherData, chatHistory = []) {
   console.log("🔍 Analyzing question:", question);
@@ -1281,13 +1295,13 @@ ${structuredData}`;
     const apiResponse = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: 'deepseek/deepseek-r1:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 800
+        max_tokens: 800  // Dynamic token allocation
       },
       {
         headers: {
@@ -1296,7 +1310,7 @@ ${structuredData}`;
           'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000'
         },
         // Add timeout configuration
-        timeout: 30000 // 30 seconds timeout
+        timeout: 60000 // 60 seconds timeout
       }
     );
     
